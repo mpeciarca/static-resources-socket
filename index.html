@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MAIMAI - Invia Playlist</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 400px;
+    }
+    .logo {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: #7c3aed;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .status {
+      text-align: center;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .status.connecting { background: #1e1b4b; color: #a78bfa; }
+    .status.connected { background: #052e16; color: #4ade80; }
+    .status.error { background: #450a0a; color: #f87171; }
+    .status.sent { background: #172554; color: #60a5fa; }
+    label {
+      display: block;
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 16px;
+    }
+    input:focus { border-color: #7c3aed; }
+    input::placeholder { color: #555; }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .hint {
+      text-align: center;
+      color: #555;
+      font-size: 12px;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">MAIMAI</div>
+    <div class="subtitle">Invia URL playlist alla TV</div>
+    <div class="status connecting" id="status">Connessione in corso...</div>
+    <label for="url">URL Playlist M3U</label>
+    <input type="url" id="url" placeholder="https://example.com/playlist.m3u" autocomplete="off" />
+    <button id="sendBtn" disabled>Invia alla TV</button>
+    <p class="hint">Inserisci l'URL della playlist M3U e premi Invia</p>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session');
+    const statusEl = document.getElementById('status');
+    const urlInput = document.getElementById('url');
+    const sendBtn = document.getElementById('sendBtn');
+
+    if (!sessionId) {
+      statusEl.className = 'status error';
+      statusEl.textContent = 'Sessione non valida. Scansiona di nuovo il QR Code.';
+    } else {
+      const socket = io('https://socket-io-a9jo.onrender.com', {
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', () => {
+        socket.emit('join-session', sessionId);
+        statusEl.className = 'status connected';
+        statusEl.textContent = 'Connesso alla TV';
+        sendBtn.disabled = false;
+      });
+
+      socket.on('connect_error', () => {
+        statusEl.className = 'status error';
+        statusEl.textContent = 'Errore di connessione. Riprova.';
+        sendBtn.disabled = true;
+      });
+
+      socket.on('disconnect', () => {
+        statusEl.className = 'status error';
+        statusEl.textContent = 'Disconnesso. Riconnessione...';
+        sendBtn.disabled = true;
+      });
+
+      sendBtn.addEventListener('click', () => {
+        const url = urlInput.value.trim();
+        if (!url) return;
+        socket.emit('send-text', { sessionId, text: url });
+        statusEl.className = 'status sent';
+        statusEl.textContent = 'URL inviato alla TV!';
+        sendBtn.disabled = true;
+        setTimeout(() => {
+          sendBtn.disabled = false;
+          statusEl.className = 'status connected';
+          statusEl.textContent = 'Connesso alla TV';
+        }, 3000);
+      });
+    }
+  </script>
+</body>
+</html>
